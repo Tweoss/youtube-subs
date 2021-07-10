@@ -1,6 +1,7 @@
 const Discord = require('discord.js');
 var https = require('https');
-var fs = require('fs');
+const fs = require('fs')
+const Canvas = require('canvas')
 const express = require('express');
 const app = express();
 const port = 8080;
@@ -17,6 +18,8 @@ let channel = null,
     log_channel = null,
     timeout = null,
     interval = null;
+
+Canvas.registerFont('./fonts/Roboto-Medium.ttf', { family: 'Roberto' });
 
 // when the discord client is ready
 const client = new Discord.Client();
@@ -35,11 +38,10 @@ client.on('ready', () => {
 // use the .env bot_token from discord to login
 client.login(process.env.BOT_TOKEN)
 
-// necessary for ping or no?
-// app.get('/', (_, res) => {
-//     res.send('Nobody here.')
-//     console.log("/set?bot=" + process.env.BOT_TOKEN);
-// })
+// necessary for pinging
+app.get('/', (_, res) => {
+    res.send('Nobody here.')
+})
 
 app.use(express.json());
 app.post('/set/user/' + process.env.USER_ID, (req, res) => {
@@ -113,13 +115,41 @@ function fetchAndSend() {
                     return;
                 }
                 let count = response.items[0].statistics.subscriberCount;
-                let msg = '<@541648949916991498> is currently at ' + count + ' subscribers.';
-                channel.send(msg);
+                generateAndSendImage(count, channel);
             });
         }).end();
     } catch (err) {
         console.log(err);
     }
+
+}
+
+
+function generateAndSendImage(count, channel) {
+    fs.readFile('./template.png', function(err, data) {
+        if (err) { console.log(err); return; }
+        let img = new Canvas.Image; // Create a new Image
+        img.src = data;
+
+        // Initialiaze a new Canvas with the same dimensions
+        // as the image, and get a 2D drawing context for it.
+        let canvas = new Canvas.Canvas(img.width, img.height);
+        let ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+
+        ctx.font = '26pt "Roberto"';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = '#7F7F7F';
+        ctx.fillText(count + ' subscribers', 210, 110);
+        let buffer = canvas.toBuffer('image/png');
+        fs.writeFileSync('./count_output.png', buffer);
+        channel.send('', {
+            files: [
+                "./count_output.png"
+            ]
+        });
+    });
 
 }
 
