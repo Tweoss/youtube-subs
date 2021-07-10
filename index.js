@@ -1,6 +1,5 @@
 const Discord = require('discord.js');
 var https = require('https');
-var http = require('http');
 var fs = require('fs');
 const express = require('express');
 const app = express();
@@ -15,6 +14,7 @@ const options = {
 
 // discord channel to send messages to
 let channel = null,
+    log_channel = null,
     timeout = null,
     interval = null;
 
@@ -23,6 +23,7 @@ const client = new Discord.Client();
 client.on('ready', () => {
     console.log('Bot started');
     channel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID)
+    log_channel = client.channels.cache.get(process.env.LOG_CHANNEL_ID)
     fs.readFile('./time.json', (err, data) => {
         if (err) {
             console.log(err);
@@ -79,6 +80,11 @@ function setMessageTimeout(timeJSON) {
     tomorrow.setMinutes(timeJSON.time.minutes);
     tomorrow.setSeconds(timeJSON.time.seconds);
     let difference = (tomorrow.getTime() - now.getTime()) % 86400000;
+    log_channel.send("Time has been set and is now " +
+        JSON.stringify({ "hours": timeJSON.time.hours, "minutes": timeJSON.time.minutes, "seconds": timeJSON.time.seconds, "interval": timeJSON.time.interval }) +
+        "\nThe next message will be sent at " + new Date(now.getTime() + difference) + " in " + Math.floor(difference / 3600000) + " hours, " + Math.floor(difference / 60000) % 60 + " minutes, and " + Math.floor(difference / 1000) % 60 +
+        " seconds after which updates will be sent every " + Math.floor(timeJSON.time.interval / 3600000) + " hours, " + Math.floor(timeJSON.time.interval / 60000) % 60 + " minutes, and " + Math.floor(timeJSON.time.interval / 1000) % 60 +
+        " seconds.\nIt is currently " + new Date() + ".");
     clearTimeout(timeout);
     timeout = setTimeout(() => {
         setMessageInterval(timeJSON);
