@@ -79,11 +79,6 @@ function setMessageTimeout(timeJSON) {
     tomorrow.setMinutes(timeJSON.time.minutes);
     tomorrow.setSeconds(timeJSON.time.seconds);
     let difference = (tomorrow.getTime() - now.getTime()) % 86400000;
-    console.log(now)
-    console.log(tomorrow)
-    console.log(timeJSON)
-    console.log(difference)
-    console.log(tomorrow.getTime() - now.getTime())
     clearTimeout(timeout);
     timeout = setTimeout(() => {
         setMessageInterval(timeJSON);
@@ -92,9 +87,10 @@ function setMessageTimeout(timeJSON) {
 
 function setMessageInterval(timeJSON) {
     clearInterval(interval);
+    fetchAndSend();
     interval = setInterval(() => {
         fetchAndSend();
-    }, timeJSON.interval);
+    }, timeJSON.time.interval);
 }
 
 function fetchAndSend() {
@@ -106,9 +102,12 @@ function fetchAndSend() {
             });
             response.on('end', () => {
                 let response = JSON.parse(str);
-                console.log(response);
+                if (response.err != null) {
+                    console.log(response.err);
+                    return;
+                }
                 let count = response.items[0].statistics.subscriberCount;
-                let msg = /*'<@541648949916991498> is currently at ' +*/ count + ' subscribers.';
+                let msg = '<@541648949916991498> is currently at ' + count + ' subscribers.';
                 channel.send(msg);
             });
         }).end();
