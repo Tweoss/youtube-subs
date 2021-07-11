@@ -27,6 +27,7 @@ client.on('ready', () => {
     console.log('Bot started');
     channel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID)
     log_channel = client.channels.cache.get(process.env.LOG_CHANNEL_ID)
+    log_channel.send("Bot has (re)started.");
     fs.readFile('./time.json', (err, data) => {
         if (err) {
             console.log(err);
