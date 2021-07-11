@@ -141,7 +141,7 @@ function generateAndSendImage(count, channel) {
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
         ctx.fillStyle = '#7F7F7F';
-        ctx.fillText(count + ' subscribers', 210, 110);
+        ctx.fillText(count + ' subscribers', 310, 150);
         let buffer = canvas.toBuffer('image/png');
         fs.writeFileSync('./count_output.png', buffer);
         channel.send('', {
