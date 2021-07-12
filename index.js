@@ -172,7 +172,7 @@ function generateAndSendImage(count, old_count, channelID) {
         // print percent change since last run
         ctx.font = '13pt "Roberto"';
         ctx.fillStyle = '#5785cf'; // blue
-        old_count ? ctx.fillText((old_count >= count ? '+' : '') + Math.round((old_count - count) / count * 100) + '% since last run', 310, 150 + 40) : 0;
+        old_count ? ctx.fillText((old_count >= count ? '+' : '') + ((old_count - count) / count * 100).toFixed(2) + '% since last run', 310, 150 + 40) : 0;
         let buffer = canvas.toBuffer('image/png');
         fs.writeFileSync('./count_output.png', buffer);
         channelID.send('', {
