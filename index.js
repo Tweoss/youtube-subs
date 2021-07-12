@@ -17,7 +17,8 @@ const options = {
 let channel = null,
     log_channel = null,
     timeout = null,
-    interval = null;
+    interval = null,
+    count = null;
 
 Canvas.registerFont('./fonts/Roboto-Medium.ttf', { family: 'Roberto' });
 
@@ -36,6 +37,30 @@ client.on('ready', () => {
         }
     })
 });
+
+// handle manual commands
+client.on('message', (message) => {
+    if (message.author.bot) {
+        return;
+    }
+    if (message.content.startsWith(process.env.COMMAND_PREFIX)) {
+        let args = message.content.replace(process.env.COMMAND_PREFIX, '').split(' '),
+            command = args.shift();
+        if (command == 'subs' || command == 's' || command == 'subcount') {
+            fetchAndSend(message.channel);
+        } else if (command == 'help' || command == 'h') {
+            message.channel.send("```\n" +
+                "Help:\n" +
+                "\tsubs - shows the number of subscribers \n" +
+                "\t\t(aliases: \"s\",\"subcount\")\n" +
+                "\thelp - shows this help message\n" +
+                "\t\t(aliases: \"h\")" +
+                "```"
+            )
+        }
+    }
+});
+
 // use the .env bot_token from discord to login
 client.login(process.env.BOT_TOKEN)
 
@@ -96,13 +121,13 @@ function setMessageTimeout(timeJSON) {
 
 function setMessageInterval(timeJSON) {
     clearInterval(interval);
-    fetchAndSend();
+    fetchAndSend(channel);
     interval = setInterval(() => {
-        fetchAndSend();
+        fetchAndSend(channel);
     }, timeJSON.time.interval);
 }
 
-function fetchAndSend() {
+function fetchAndSend(channelID) {
     try {
         https.request(options, (response) => {
             var str = '';
@@ -115,8 +140,9 @@ function fetchAndSend() {
                     console.log(response.err);
                     return;
                 }
-                let count = response.items[0].statistics.subscriberCount;
-                generateAndSendImage(count, channel);
+                let old_count = count ? count : 0;
+                count = response.items[0].statistics.subscriberCount;
+                generateAndSendImage(count, old_count, channelID);
             });
         }).end();
     } catch (err) {
@@ -125,8 +151,7 @@ function fetchAndSend() {
 
 }
 
-
-function generateAndSendImage(count, channel) {
+function generateAndSendImage(count, old_count, channelID) {
     fs.readFile('./template.png', function(err, data) {
         if (err) { console.log(err); return; }
         let img = new Canvas.Image; // Create a new Image
@@ -138,14 +163,19 @@ function generateAndSendImage(count, channel) {
         let ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, img.width, img.height);
 
+        // print sub count
         ctx.font = '26pt "Roberto"';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
         ctx.fillStyle = '#7F7F7F';
         ctx.fillText(count + ' subscribers', 310, 150);
+        // print percent change since last run
+        ctx.font = '13pt "Roberto"';
+        ctx.fillStyle = '#5785cf'; // blue
+        old_count ? ctx.fillText(old_count > count ? '+' : '' + Math.round((old_count - count) / count * 100) + '% since last run', 310, 150 + 40) : 0;
         let buffer = canvas.toBuffer('image/png');
         fs.writeFileSync('./count_output.png', buffer);
-        channel.send('', {
+        channelID.send('', {
             files: [
                 "./count_output.png"
             ]
