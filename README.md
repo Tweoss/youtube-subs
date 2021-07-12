@@ -8,3 +8,4 @@ Simple discord bot. Uses youtube api to obtain subscriber count on a daily basis
 * USER_ID=the user id used for basic verification in http post requests that can set interval and time
 * DISCORD_CHANNEL_ID=the channel to send results to
 * LOG_CHANNEL_ID=where to log changes
+* COMMAND_PREFIX=the bot's command prefix for commands such as \*help (where the \* is the prefix)
