@@ -24,6 +24,7 @@ Canvas.registerFont('./fonts/Roboto-Medium.ttf', { family: 'Roberto' });
 
 // when the discord client is ready
 const client = new Discord.Client();
+client.setMaxListeners(0);
 client.on('ready', () => {
     console.log('Bot started');
     channel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID)
