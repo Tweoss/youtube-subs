@@ -5,7 +5,7 @@ const Canvas = require('canvas')
 const express = require('express');
 const app = express();
 const port = 8080;
-require('dotenv').config();
+require('dotenv').config(); // fuck
 
 const options = {
     protocol: 'https:',
