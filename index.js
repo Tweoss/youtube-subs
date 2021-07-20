@@ -322,7 +322,6 @@ function getSubscriberCount(timeJSON, isScheduled) {
                                 // SCALING ---------------------------
                                 const xRange = [min_x, max_x];
                                 const yRange = [min_y, max_y];
-                                console.log(xRange, yRange);
                                 // const yRange = [timeJSON.subscribe_range.min_y, timeJSON.subscribe_range.max_y];
                                 // define scales (scaling from marks to pixels)
                                 const xScale = d3.scaleTime().domain(xRange).range([20, width]);
