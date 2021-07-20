@@ -259,189 +259,186 @@ function getSubscriberCount(timeJSON, isScheduled) {
                             console.log(err);
                         }
                     });
-                    // read background image
-                    fs.readFile('./xOvernight_4.png', function(err, img_data) {
-                        if (err) { console.log(err); return; }
-                        const d3 = d3n.d3;
-                        let data = [];
-                        let max_x, max_y, min_x, min_y;
-                        // read csv file
-                        fs.createReadStream('./past.csv')
-                            .pipe(csv())
-                            .on('data', (row) => {
-                                // set the time to the beginning of the day
-                                let time = new Date(parseInt(row.day));
-                                time.setHours(0, 0, 0, 0);
-                                row.day = time.getTime();
-                                data.push(row);
-                                if (row.day > max_x || max_x == null) {
-                                    max_x = row.day;
-                                }
-                                if (row.day < min_x || min_x == null) {
-                                    min_x = row.day;
-                                }
-                                for (const [key, value] of Object.entries(row)) {
-                                    if (key !== 'day') {
-                                        let v = parseInt(value);
-                                        if (v > max_y || max_y == null) {
-                                            max_y = v;
-                                        }
-                                        if (v < min_y || min_y == null) {
-                                            min_y = v;
-                                        }
+                    const d3 = d3n.d3;
+                    let data = [];
+                    let max_x, max_y, min_x, min_y;
+                    // read csv file
+                    fs.createReadStream('./past.csv')
+                        .pipe(csv())
+                        .on('data', (row) => {
+                            // set the time to the beginning of the day
+                            let time = new Date(parseInt(row.day));
+                            time.setHours(0, 0, 0, 0);
+                            row.day = time.getTime();
+                            data.push(row);
+                            if (row.day > max_x || max_x == null) {
+                                max_x = row.day;
+                            }
+                            if (row.day < min_x || min_x == null) {
+                                min_x = row.day;
+                            }
+                            for (const [key, value] of Object.entries(row)) {
+                                if (key !== 'day') {
+                                    let v = parseInt(value);
+                                    if (v > max_y || max_y == null) {
+                                        max_y = v;
+                                    }
+                                    if (v < min_y || min_y == null) {
+                                        min_y = v;
                                     }
                                 }
+                            }
+                        })
+                        .on('end', async() => {
+                            d3.select(d3n.document.querySelector('svg')).remove('svg')
+
+                            // COLORS ---------------------------
+                            // deterministic based on order
+                            let colDict = {};
+                            let channels = [];
+                            for (const [key, _] of Object.entries(data[0])) {
+                                if (key !== 'day') {
+                                    colDict[key] = genColors();
+                                    channels.push(key);
+                                }
+                            }
+                            channels.sort();
+
+                            // SIZE ---------------------------
+                            const margin = { top: 50, right: 25, bottom: 25, left: 25 };
+                            const width = 700 - margin.right - margin.left;
+                            const height = 500 - margin.top - margin.bottom;
+
+                            // MAIN SVG ---------------------------
+                            const svg = d3.select(d3n.document.querySelector('body')).append('svg')
+                                .attr('width', width + margin.right + margin.left)
+                                .attr('height', height + margin.top + margin.bottom)
+                                .append('g')
+                                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+                            // SCALING ---------------------------
+                            const xRange = [min_x, max_x];
+                            const yRange = [min_y, max_y];
+                            // const yRange = [timeJSON.subscribe_range.min_y, timeJSON.subscribe_range.max_y];
+                            // define scales (scaling from marks to pixels)
+                            const xScale = d3.scaleTime().domain(xRange).range([20, width]);
+                            const yScale = d3.scaleLinear().domain(yRange).range([height, 20]);
+
+                            // AXES ---------------------------
+                            const xAxis = d3.axisBottom()
+                                .scale(xScale)
+                                .tickSize(5)
+                                .ticks(9)
+                                .tickSizeInner(-height); // inner ticks are the grid lines
+                            const yAxis = d3.axisRight()
+                                .scale(yScale)
+                                .tickSize(5)
+                                .ticks(10)
+                                .tickSizeInner(-width); // inner ticks are the grid lines
+                            const xSvg = svg.append('g').attr('id', 'xAxisG').call(xAxis);
+                            const ySvg = svg.append('g').attr('id', 'yAxisG').call(yAxis);
+                            xSvg.selectAll('*').style('stroke', '#909090');
+                            xSvg.selectAll('text').style('stroke', 'white');
+                            xSvg.attr('transform', 'translate(0,' + height + ')');
+                            ySvg.selectAll('*').style('stroke', '#909090');
+                            ySvg.selectAll('text').style('stroke', 'white');
+                            ySvg.attr('transform', 'translate(' + width + ',0)');
+
+                            for (const key of channels) {
+                                // POINTS ---------------------------
+                                svg.selectAll('circle.' + key)
+                                    .data(data)
+                                    .enter()
+                                    .append('circle')
+                                    .attr('class', key)
+                                    .attr('r', 5)
+                                    .attr('cx', d => xScale(d.day))
+                                    .attr('cy', d => yScale(d[key]))
+                                    .style('fill', colDict[key]);
+
+                                // LINES ---------------------------
+                                let lineFunction = d3.line()
+                                    .x(d => xScale(d.day))
+                                    .y(d => yScale(d[key]));
+                                svg.append('path')
+                                    .attr('class', 'tweets')
+                                    .attr('d', lineFunction(data))
+                                    .attr('fill', 'none')
+                                    .attr('stroke', colDict[key])
+                                    .attr('stroke-width', 5)
+
+                                // AREA ---------------------------
+                                var area = d3.area()
+                                    .x(function(d) { return xScale(d.day); })
+                                    .y0(height)
+                                    .y1(function(d) { return yScale(d[key]); });
+                                // add the area
+                                svg.append("path")
+                                    .data([data])
+                                    .attr("class", "area")
+                                    .attr("d", area)
+                                    .style("fill", colDict[key] + '90');
+                            }
+
+                            // LEGEND ---------------------------
+                            var legend_keys = [];
+                            for (const key of channels) {
+                                legend_keys = legend_keys.concat([key]);
+                            }
+                            var lineLegend = svg.selectAll(".lineLegend").data(legend_keys)
+                                .enter().append("g")
+                                .attr("class", "lineLegend")
+                                .attr("transform", function(d, i) {
+                                    return "translate(" + (margin.left) + "," + (i * 20) + ")";
+                                });
+                            lineLegend.append("text").text(function(d) { return d; })
+                                .attr("transform", "translate(15, 6)") //align texts with boxes
+                                .style('stroke', 'white')
+                                .style('fill', 'white')
+                                .style('font-size', 20);
+                            lineLegend.append("rect")
+                                .attr("fill", d => colDict[d])
+                                .attr("width", 12).attr('height', 5);
+
+                            // TITLE ---------------------------
+                            d3.select(d3n.document.querySelector('svg'))
+                                .append('text')
+                                .html('Subscribers Graph')
+                                .attr('x', width / 2 - margin.right)
+                                .attr('y', margin.top / 2)
+                                .attr('font', 'Georgia')
+                                .style('font-size', 25)
+                                .style('fill', 'white')
+                                .style('stroke', 'white');
+
+                            // out of modifying the svg now, comment format changes
+                            // --------------------------- CONVERT TO PNG
+                            const outputBuffer = await svg2png({
+                                input: d3n.svgString(),
+                                encoding: 'buffer',
+                                format: 'png',
+                                quality: 1
                             })
-                            .on('end', async() => {
-                                d3.select(d3n.document.querySelector('svg')).remove('svg')
 
-                                // COLORS ---------------------------
-                                // deterministic based on order
-                                let colDict = {};
-                                let channels = [];
-                                for (const [key, _] of Object.entries(data[0])) {
-                                    if (key !== 'day') {
-                                        colDict[key] = genColors();
-                                        channels.push(key);
-                                    }
-                                }
-                                channels.sort();
-
-                                // SIZE ---------------------------
-                                const margin = { top: 50, right: 25, bottom: 25, left: 25 };
-                                const width = 700 - margin.right - margin.left;
-                                const height = 500 - margin.top - margin.bottom;
-
-                                // MAIN SVG ---------------------------
-                                const svg = d3.select(d3n.document.querySelector('body')).append('svg')
-                                    .attr('width', width + margin.right + margin.left)
-                                    .attr('height', height + margin.top + margin.bottom)
-                                    .append('g')
-                                    .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
-
-                                // SCALING ---------------------------
-                                const xRange = [min_x, max_x];
-                                const yRange = [min_y, max_y];
-                                // const yRange = [timeJSON.subscribe_range.min_y, timeJSON.subscribe_range.max_y];
-                                // define scales (scaling from marks to pixels)
-                                const xScale = d3.scaleTime().domain(xRange).range([20, width]);
-                                const yScale = d3.scaleLinear().domain(yRange).range([height, 20]);
-
-                                // AXES ---------------------------
-                                const xAxis = d3.axisBottom()
-                                    .scale(xScale)
-                                    .tickSize(5)
-                                    .ticks(9)
-                                    .tickSizeInner(-height); // inner ticks are the grid lines
-                                const yAxis = d3.axisRight()
-                                    .scale(yScale)
-                                    .tickSize(5)
-                                    .ticks(10)
-                                    .tickSizeInner(-width); // inner ticks are the grid lines
-                                const xSvg = svg.append('g').attr('id', 'xAxisG').call(xAxis);
-                                const ySvg = svg.append('g').attr('id', 'yAxisG').call(yAxis);
-                                xSvg.selectAll('*').style('stroke', '#909090');
-                                xSvg.selectAll('text').style('stroke', 'white');
-                                xSvg.attr('transform', 'translate(0,' + height + ')');
-                                ySvg.selectAll('*').style('stroke', '#909090');
-                                ySvg.selectAll('text').style('stroke', 'white');
-                                ySvg.attr('transform', 'translate(' + width + ',0)');
-
-                                for (const key of channels) {
-                                    // POINTS ---------------------------
-                                    svg.selectAll('circle.' + key)
-                                        .data(data)
-                                        .enter()
-                                        .append('circle')
-                                        .attr('class', key)
-                                        .attr('r', 5)
-                                        .attr('cx', d => xScale(d.day))
-                                        .attr('cy', d => yScale(d[key]))
-                                        .style('fill', colDict[key]);
-
-                                    // LINES ---------------------------
-                                    let lineFunction = d3.line()
-                                        .x(d => xScale(d.day))
-                                        .y(d => yScale(d[key]));
-                                    svg.append('path')
-                                        .attr('class', 'tweets')
-                                        .attr('d', lineFunction(data))
-                                        .attr('fill', 'none')
-                                        .attr('stroke', colDict[key])
-                                        .attr('stroke-width', 5)
-
-                                    // AREA ---------------------------
-                                    var area = d3.area()
-                                        .x(function(d) { return xScale(d.day); })
-                                        .y0(height)
-                                        .y1(function(d) { return yScale(d[key]); });
-                                    // add the area
-                                    svg.append("path")
-                                        .data([data])
-                                        .attr("class", "area")
-                                        .attr("d", area)
-                                        .style("fill", colDict[key] + '90');
-                                }
-
-                                // LEGEND ---------------------------
-                                var legend_keys = [];
-                                for (const key of channels) {
-                                    legend_keys = legend_keys.concat([key]);
-                                }
-                                var lineLegend = svg.selectAll(".lineLegend").data(legend_keys)
-                                    .enter().append("g")
-                                    .attr("class", "lineLegend")
-                                    .attr("transform", function(d, i) {
-                                        return "translate(" + (margin.left) + "," + (i * 20) + ")";
-                                    });
-                                lineLegend.append("text").text(function(d) { return d; })
-                                    .attr("transform", "translate(15, 6)") //align texts with boxes
-                                    .style('stroke', 'white')
-                                    .style('fill', 'white')
-                                    .style('font-size', 20);
-                                lineLegend.append("rect")
-                                    .attr("fill", d => colDict[d])
-                                    .attr("width", 12).attr('height', 5);
-
-                                // TITLE ---------------------------
-                                d3.select(d3n.document.querySelector('svg'))
-                                    .append('text')
-                                    .html('Subscribers Graph')
-                                    .attr('x', width / 2 - margin.right)
-                                    .attr('y', margin.top / 2)
-                                    .attr('font', 'Georgia')
-                                    .style('font-size', 25)
-                                    .style('fill', 'white')
-                                    .style('stroke', 'white');
-
-                                // --------------------------- CONVERT TO PNG
-                                const outputBuffer = await svg2png({
-                                    input: d3n.svgString(),
-                                    encoding: 'buffer',
-                                    format: 'png',
-                                    quality: 1
+                            // --------------------------- OVERLAY and RETURNS
+                            sharp('./Galaxy.png')
+                                .composite([{ input: outputBuffer, gravity: 'centre' }])
+                                .toBuffer().then(overlayBuffer => {
+                                    let file = new Discord.MessageAttachment(overlayBuffer, 'count_output.png')
+                                    resolve(
+                                        new Discord.MessageEmbed()
+                                        .setTitle('Subscribers [*s]')
+                                        .setAuthor('xOverBot', 'https://raw.githubusercontent.com/Tweoss/youtube-subs/master/x.png', 'https://github.com/tweoss/youtube-subs')
+                                        .setThumbnail('https://raw.githubusercontent.com/Tweoss/youtube-subs/master/xOvernight_4.png')
+                                        .setColor('#0099ff')
+                                        .addFields({ name: 'Current', value: count, inline: true }, { name: 'Last Run', value: (count >= old_count ? '+' : '') + (count - old_count), inline: true }, { name: 'Last Scheduled Run', value: (count >= timeJSON.last.ran ? '+' : '') + (count - timeJSON.last.ran), inline: true })
+                                        .setTimestamp()
+                                        .setFooter('Made by Stephanobros for xOvernight')
+                                        .attachFiles([file])
+                                        .setImage('attachment://count_output.png')
+                                    )
                                 })
-
-                                // --------------------------- OVERLAY and RETURNS
-                                sharp('./Galaxy.png')
-                                    .composite([{ input: outputBuffer, gravity: 'centre' }])
-                                    .toBuffer().then(overlayBuffer => {
-                                        let file = new Discord.MessageAttachment(overlayBuffer, 'count_output.png')
-                                        resolve(
-                                            new Discord.MessageEmbed()
-                                            .setTitle('Subscribers [*s]')
-                                            .setAuthor('xOverBot', 'https://raw.githubusercontent.com/Tweoss/youtube-subs/master/x.png', 'https://github.com/tweoss/youtube-subs')
-                                            .setThumbnail('https://raw.githubusercontent.com/Tweoss/youtube-subs/master/xOvernight_4.png')
-                                            .setColor('#0099ff')
-                                            .addFields({ name: 'Current', value: count }, { name: 'Last Run', value: (count >= old_count ? '+' : '') + (count - old_count) }, { name: 'Last Scheduled Run', value: (count >= timeJSON.last.ran ? '+' : '') + (count - timeJSON.last.ran) })
-                                            .setTimestamp()
-                                            .setFooter('Made by Stephanobros for xOvernight')
-                                            .attachFiles([file])
-                                            .setImage('attachment://count_output.png')
-                                        )
-                                    })
-                            });
-                    });
+                        });
                 });
             }).end();
         });
